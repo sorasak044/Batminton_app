@@ -50,11 +50,11 @@ class _HomeScreenState extends State<HomeScreen> {
         items: const [
           BottomNavigationBarItem(
             icon: FaIcon(FontAwesomeIcons.house),
-            label: 'หน้าหลัก',
+            label: 'หน้าHome',
           ),
           BottomNavigationBarItem(
             icon: Icon(Icons.calendar_today),
-            label: 'การจองของฉัน',
+            label: 'การจองของฉัน ',
           ),
           BottomNavigationBarItem(
             icon: Icon(Icons.person),
