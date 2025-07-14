@@ -15,7 +15,10 @@ class BookingSummaryScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final totalHours = selectedCourtsByTime.keys.length;
-    final totalCourts = selectedCourtsByTime.values.fold(0, (sum, set) => sum + set.length);
+    final totalCourts = selectedCourtsByTime.values.fold(
+      0,
+      (sum, set) => sum + set.length,
+    );
     final totalPrice = totalHours * totalCourts * pricePerHour;
 
     return Scaffold(
@@ -44,17 +47,26 @@ class BookingSummaryScreen extends StatelessWidget {
                     children: [
                       Text(
                         '${selectedDate.day} ${_thaiMonth(selectedDate.month)} ${selectedDate.year + 543}',
-                        style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                        style: const TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.bold,
+                        ),
                       ),
                       Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 8,
+                          vertical: 4,
+                        ),
                         decoration: BoxDecoration(
                           color: Colors.yellow[600],
                           borderRadius: BorderRadius.circular(6),
                         ),
                         child: const Text(
                           "รอดำเนินการ",
-                          style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold),
+                          style: TextStyle(
+                            fontSize: 12,
+                            fontWeight: FontWeight.bold,
+                          ),
                         ),
                       ),
                     ],
@@ -74,16 +86,28 @@ class BookingSummaryScreen extends StatelessWidget {
                             Column(
                               crossAxisAlignment: CrossAxisAlignment.end,
                               children: [
-                                Text("$time - ${_getEndTime(time)}", style: const TextStyle(fontSize: 14)),
-                                const Text("1 ชั่วโมง", style: TextStyle(fontSize: 12, color: Colors.black54)),
+                                Text(
+                                  "$time - ${_getEndTime(time)}",
+                                  style: const TextStyle(fontSize: 14),
+                                ),
+                                const Text(
+                                  "1 ชั่วโมง",
+                                  style: TextStyle(
+                                    fontSize: 12,
+                                    color: Colors.black54,
+                                  ),
+                                ),
                               ],
                             ),
-                            Text("${pricePerHour.toStringAsFixed(2)}", style: const TextStyle(fontSize: 16)),
+                            Text(
+                              pricePerHour.toStringAsFixed(2),
+                              style: const TextStyle(fontSize: 16),
+                            ),
                           ],
                         ),
                       );
                     });
-                  }).toList(),
+                  }),
                 ],
               ),
             ),
@@ -95,7 +119,10 @@ class BookingSummaryScreen extends StatelessWidget {
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
                 const Text("รวมเวลา", style: TextStyle(fontSize: 16)),
-                Text("$totalHours ชั่วโมง", style: const TextStyle(fontSize: 16)),
+                Text(
+                  "$totalHours ชั่วโมง",
+                  style: const TextStyle(fontSize: 16),
+                ),
               ],
             ),
             const SizedBox(height: 6),
@@ -103,7 +130,10 @@ class BookingSummaryScreen extends StatelessWidget {
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
                 const Text("รวมค่าบริการ", style: TextStyle(fontSize: 16)),
-                Text("${totalPrice.toStringAsFixed(2)}", style: const TextStyle(fontSize: 16)),
+                Text(
+                  totalPrice.toStringAsFixed(2),
+                  style: const TextStyle(fontSize: 16),
+                ),
               ],
             ),
 
@@ -117,7 +147,10 @@ class BookingSummaryScreen extends StatelessWidget {
                   // TODO: ไปยังหน้าชำระเงิน QR พร้อมเพย์
                 },
                 icon: const Icon(Icons.qr_code),
-                label: const Text("ชำระเงินผ่าน PromptPay"),
+                label: const Text(
+                  "ชำระเงินผ่าน PromptPay",
+                  style: TextStyle(color: Colors.white),
+                ),
                 style: ElevatedButton.styleFrom(
                   backgroundColor: Colors.green[800],
                   padding: const EdgeInsets.symmetric(vertical: 14),
@@ -140,8 +173,19 @@ class BookingSummaryScreen extends StatelessWidget {
 
   String _thaiMonth(int month) {
     const months = [
-      "", "ม.ค.", "ก.พ.", "มี.ค.", "เม.ย.", "พ.ค.", "มิ.ย.",
-      "ก.ค.", "ส.ค.", "ก.ย.", "ต.ค.", "พ.ย.", "ธ.ค."
+      "",
+      "ม.ค.",
+      "ก.พ.",
+      "มี.ค.",
+      "เม.ย.",
+      "พ.ค.",
+      "มิ.ย.",
+      "ก.ค.",
+      "ส.ค.",
+      "ก.ย.",
+      "ต.ค.",
+      "พ.ย.",
+      "ธ.ค.",
     ];
     return months[month];
   }
