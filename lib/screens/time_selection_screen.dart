@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:badminton_booking_app/screens/court_availability_screen.dart';
+import 'court_selection_screen.dart';
 
 class TimeSelectionScreen extends StatefulWidget {
   final DateTime selectedDate;
@@ -8,7 +8,8 @@ class TimeSelectionScreen extends StatefulWidget {
   const TimeSelectionScreen({
     super.key,
     required this.selectedDate,
-    required this.courtName,
+    required this.courtName
+    
   });
 
   @override
@@ -23,11 +24,17 @@ class _TimeSelectionScreenState extends State<TimeSelectionScreen> {
     return '${hour.toString().padLeft(2, '0')}:00';
   });
 
+  String addOneHour(String time) {
+    final hour = int.parse(time.split(':')[0]);
+    final nextHour = hour + 1;
+    return '${nextHour.toString().padLeft(2, '0')}:00';
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: Text('เลือกเวลา - ${widget.courtName}'),
+        title: Text('เลือกเวลา - ${widget.selectedDate.day}/${widget.selectedDate.month}/${widget.selectedDate.year + 543}'),
         backgroundColor: Colors.green[700],
       ),
       body: Padding(
@@ -37,7 +44,6 @@ class _TimeSelectionScreenState extends State<TimeSelectionScreen> {
             const SizedBox(height: 20),
             const Text('เลือกเวลาเริ่มต้น:', style: TextStyle(fontSize: 16)),
             const SizedBox(height: 20),
-
             Expanded(
               child: ListView.builder(
                 itemCount: availableTimes.length,
@@ -71,26 +77,24 @@ class _TimeSelectionScreenState extends State<TimeSelectionScreen> {
                 },
               ),
             ),
-
             const SizedBox(height: 10),
             SizedBox(
               width: double.infinity,
               child: ElevatedButton(
-                onPressed:
-                    selectedTime == null
-                        ? null
-                        : () {
-                          Navigator.push(
-                            context,
-                            MaterialPageRoute(
-                              builder:
-                                  (_) => CourtSelectionScreen(
-                                    selectedDate: widget.selectedDate,
-                                    // selectedTime: selectedTime!,
-                                  ),
+                onPressed: selectedTime == null
+                    ? null
+                    : () {
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (_) => CourtSelectionScreen(
+                              selectedDate: widget.selectedDate,
+                              startTime: selectedTime!,
+                              endTime: addOneHour(selectedTime!),
                             ),
-                          );
-                        },
+                          ),
+                        );
+                      },
                 style: ElevatedButton.styleFrom(
                   backgroundColor: Colors.green[800],
                   padding: const EdgeInsets.symmetric(vertical: 14),

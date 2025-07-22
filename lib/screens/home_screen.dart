@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:badminton_booking_app/screens/home_main_page.dart';
 import 'package:badminton_booking_app/screens/profile_screen.dart';
 import 'package:font_awesome_flutter/font_awesome_flutter.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -13,20 +14,39 @@ class HomeScreen extends StatefulWidget {
 
 class _HomeScreenState extends State<HomeScreen> {
   int _currentIndex = 0;
+  String _userName = '';
 
   final List<Widget> _pages = [
-    const HomeMainPage(), // ✅ หน้าแรก
-    const MyBookingsScreen(), // ✅ การจองของฉัน
-    const LoginScreen(), // ✅ โปรไฟล์ (mock)
+    const HomeMainPage(),
+    const MyBookingsScreen(),
+    const ProfileScreen(),
   ];
 
   final List<String> _titles = ["สนามแบดมินตัน", "การจองของฉัน", "โปรไฟล์"];
 
   @override
+  void initState() {
+    super.initState();
+    loadUserName();
+  }
+
+  Future<void> loadUserName() async {
+    final prefs = await SharedPreferences.getInstance();
+    final name = prefs.getString('userName') ?? '';
+    setState(() {
+      _userName = name;
+    });
+  }
+
+  @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: Text(_titles[_currentIndex]),
+        title: Text(
+          _userName.isNotEmpty
+              ? 'สวัสดีคุณ $_userName !'
+              : _titles[_currentIndex],
+        ),
         backgroundColor: Colors.green[700],
         centerTitle: true,
       ),
@@ -43,7 +63,7 @@ class _HomeScreenState extends State<HomeScreen> {
         items: const [
           BottomNavigationBarItem(
             icon: FaIcon(FontAwesomeIcons.house),
-            label: 'หน้าHome',
+            label: 'หน้าหลัก',
           ),
           BottomNavigationBarItem(
             icon: Icon(Icons.calendar_today),

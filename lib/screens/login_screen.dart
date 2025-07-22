@@ -1,8 +1,9 @@
+import 'package:badminton_booking_app/screens/register_screen.dart';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
-import 'package:badminton_booking_app/screens/home_screen.dart'; // นำเข้าหน้า HomeScreen
-import 'package:badminton_booking_app/screens/register_screen.dart'; // ตรวจสอบการนำเข้าของไฟล์นี้
+import 'package:shared_preferences/shared_preferences.dart';
+import 'home_screen.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -17,9 +18,14 @@ class _LoginScreenState extends State<LoginScreen> {
   bool _obscurePassword = true;
 
   Future<void> loginUser() async {
-    final url = Uri.parse(
-      'https://demoapi-production-9077.up.railway.app/api/auth/login',
-    ); // URL ของ API
+    if (emailController.text.isEmpty || passwordController.text.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text("กรุณากรอกอีเมลและรหัสผ่าน")),
+      );
+      return;
+    }
+
+    final url = Uri.parse('https://demoapi-production-9077.up.railway.app/api/auth/login');
 
     try {
       final response = await http.post(
@@ -31,32 +37,37 @@ class _LoginScreenState extends State<LoginScreen> {
         }),
       );
 
+      print("Response status: ${response.statusCode}");
+      print("Response body: ${response.body}");
+
       if (response.statusCode == 200) {
-        // ถ้าเข้าสู่ระบบสำเร็จ
         final data = json.decode(response.body);
-        String token = data['token']; // สมมติว่า API ส่ง token กลับมา
 
-        // เก็บ token หรือใช้มันในการดำเนินการต่อ
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(SnackBar(content: Text('เข้าสู่ระบบสำเร็จ!')));
+        final token = data['token'];
+        final userName = data['user']?['firstName'] ?? 'Guest';
 
-        // ไปยังหน้า HomeScreen
+        final prefs = await SharedPreferences.getInstance();
+        await prefs.setString('token', token);
+        await prefs.setString('userName', userName);
+
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('เข้าสู่ระบบสำเร็จ! ยินดีต้อนรับคุณ $userName')),
+        );
+
         Navigator.pushReplacement(
           context,
           MaterialPageRoute(builder: (_) => const HomeScreen()),
         );
       } else {
-        // ถ้าเกิดข้อผิดพลาด
         final error = json.decode(response.body);
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text('เกิดข้อผิดพลาด: ${error['message']}')),
         );
       }
     } catch (e) {
-      // ถ้าเกิดข้อผิดพลาดในการเชื่อมต่อ
+      print('เกิดข้อผิดพลาด: $e');
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('ไม่สามารถเชื่อมต่อกับเซิร์ฟเวอร์ได้')),
+        const SnackBar(content: Text('ไม่สามารถเชื่อมต่อกับเซิร์ฟเวอร์ได้')),
       );
     }
   }
@@ -118,10 +129,7 @@ class _LoginScreenState extends State<LoginScreen> {
                   ),
                 ),
                 ElevatedButton(
-                  onPressed: () {
-                    // เรียกฟังก์ชัน login
-                    loginUser();
-                  },
+                  onPressed: loginUser,
                   style: ElevatedButton.styleFrom(
                     backgroundColor: Colors.lightGreen,
                     padding: const EdgeInsets.symmetric(
