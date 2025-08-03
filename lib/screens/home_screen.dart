@@ -32,9 +32,9 @@ class _HomeScreenState extends State<HomeScreen> {
 
   Future<void> loadUserName() async {
     final prefs = await SharedPreferences.getInstance();
-    final name = prefs.getString('userName') ?? '';
+    final firstName = prefs.getString('firstName') ?? '';
     setState(() {
-      _userName = name;
+      _userName = firstName.trim();
     });
   }
 

@@ -1,9 +1,9 @@
-import 'package:badminton_booking_app/screens/register_screen.dart';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'home_screen.dart';
+import 'register_screen.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -17,6 +17,12 @@ class _LoginScreenState extends State<LoginScreen> {
   final passwordController = TextEditingController();
   bool _obscurePassword = true;
 
+  // ฟังก์ชันสำหรับการตรวจสอบว่า Token ถูกบันทึกไว้หรือไม่
+  Future<String?> _getToken() async {
+    final prefs = await SharedPreferences.getInstance();
+    return prefs.getString('auth_token');
+  }
+
   Future<void> loginUser() async {
     if (emailController.text.isEmpty || passwordController.text.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -25,7 +31,9 @@ class _LoginScreenState extends State<LoginScreen> {
       return;
     }
 
-    final url = Uri.parse('https://demoapi-production-9077.up.railway.app/api/auth/login');
+    final url = Uri.parse(
+      'https://demoapi-production-9077.up.railway.app/api/auth/login',
+    );
 
     try {
       final response = await http.post(
@@ -42,22 +50,45 @@ class _LoginScreenState extends State<LoginScreen> {
 
       if (response.statusCode == 200) {
         final data = json.decode(response.body);
-
         final token = data['token'];
-        final userName = data['user']?['firstName'] ?? 'Guest';
 
         final prefs = await SharedPreferences.getInstance();
-        await prefs.setString('token', token);
-        await prefs.setString('userName', userName);
+        await prefs.setString('auth_token', token); // บันทึก token ไว้
 
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('เข้าสู่ระบบสำเร็จ! ยินดีต้อนรับคุณ $userName')),
+        // เรียก API whoami เพื่อตรวจสอบตัวตนของผู้ใช้
+        final whoamiUrl = Uri.parse(
+          'https://demoapi-production-9077.up.railway.app/api/auth/whoami',
+        );
+        final whoamiRes = await http.get(
+          whoamiUrl,
+          headers: {"Authorization": "Bearer $token"}, // ส่ง token ใน header
         );
 
-        Navigator.pushReplacement(
-          context,
-          MaterialPageRoute(builder: (_) => const HomeScreen()),
-        );
+        if (whoamiRes.statusCode == 200) {
+          final userData = json.decode(whoamiRes.body);
+          final fullName = userData['name']?.trim() ?? 'สมชาย ใจดี';
+          final nameParts = fullName.split(' ');
+          final firstName = nameParts.isNotEmpty ? nameParts[0] : '';
+          final lastName = nameParts.length > 1 ? nameParts.sublist(1).join(' ') : '';
+
+          // บันทึกข้อมูลผู้ใช้ลงใน SharedPreferences
+          await prefs.setString('firstName', firstName);
+          await prefs.setString('lastName', lastName);
+          await prefs.setString('userName', fullName); 
+          await prefs.setString('userEmail', userData['email'] ?? '');
+          await prefs.setString('userPhone', userData['phone'] ?? '');
+
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('เข้าสู่ระบบสำเร็จ! ยินดีต้อนรับคุณ $firstName'),
+            ),
+          );
+
+          Navigator.pushReplacement(
+            context,
+            MaterialPageRoute(builder: (_) => const HomeScreen()),
+          );
+        }
       } else {
         final error = json.decode(response.body);
         ScaffoldMessenger.of(context).showSnackBar(
@@ -70,6 +101,21 @@ class _LoginScreenState extends State<LoginScreen> {
         const SnackBar(content: Text('ไม่สามารถเชื่อมต่อกับเซิร์ฟเวอร์ได้')),
       );
     }
+  }
+
+  @override
+  void initState() {
+    super.initState();
+
+    // ตรวจสอบ token ที่บันทึกไว้ใน SharedPreferences หากมีให้ทำการล็อกอินเข้าอัตโนมัติ
+    _getToken().then((token) {
+      if (token != null) {
+        Navigator.pushReplacement(
+          context,
+          MaterialPageRoute(builder: (_) => const HomeScreen()),
+        );
+      }
+    });
   }
 
   @override

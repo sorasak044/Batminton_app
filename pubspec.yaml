@@ -38,6 +38,8 @@ dependencies:
   http: ^1.4.0
   shared_preferences: ^2.0.9
   fluttertoast: ^8.0.9
+  qr_flutter: ^4.0.0
+  image_picker: ^1.0.0
 
 
 
@@ -75,8 +77,8 @@ flutter:
     - assets/images/court1.png
     - assets/images/court2.webp
     - assets/images/booking.jpg
-    
-
+    - assets/images/gift.jpg
+    - assets/
   # An image asset can refer to one or more resolution-specific "variants", see
   # https://flutter.dev/to/resolution-aware-images
 
