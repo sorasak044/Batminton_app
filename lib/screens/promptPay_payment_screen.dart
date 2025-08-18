@@ -6,29 +6,40 @@ import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'package:image_picker/image_picker.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:http_parser/http_parser.dart';
+import 'home_screen.dart';
+
 
 class PromptPayPaymentScreen extends StatefulWidget {
   final double totalAmount;
-   final int bookingId;
+  final int bookingId;
 
-  const PromptPayPaymentScreen({super.key, required this.totalAmount , required this.bookingId,});
+  const PromptPayPaymentScreen({
+    super.key,
+    required this.totalAmount,
+    required this.bookingId,
+  });
 
   @override
   State<PromptPayPaymentScreen> createState() => _PromptPayPaymentScreenState();
 }
 
 class _PromptPayPaymentScreenState extends State<PromptPayPaymentScreen> {
-  late Timer _timer;
+  Timer? _timer;
   Duration _remainingTime = const Duration(minutes: 10);
   File? _slipImage;
   String? _qrBase64;
   bool _loadingQR = true;
+  bool _uploading = false;
+  
 
   @override
   void initState() {
     super.initState();
+     print('Booking ID ที่ได้รับ: ${widget.bookingId}');
     _startCountdown();
     _generatePromptPayQR();
+    
   }
 
   void _startCountdown() {
@@ -45,107 +56,158 @@ class _PromptPayPaymentScreenState extends State<PromptPayPaymentScreen> {
 
   @override
   void dispose() {
-    _timer.cancel();
+    _timer?.cancel();
     super.dispose();
   }
 
   Future<void> _pickImage() async {
-    final picker = ImagePicker();
-    final pickedFile = await picker.pickImage(source: ImageSource.gallery);
-    if (pickedFile != null) {
-      setState(() {
-        _slipImage = File(pickedFile.path);
-      });
+    try {
+      final picker = ImagePicker();
+      final pickedFile = await picker.pickImage(source: ImageSource.gallery);
+      if (pickedFile != null) {
+        setState(() {
+          _slipImage = File(pickedFile.path);
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('ไม่สามารถเลือกภาพได้: $e')),
+        );
+      }
     }
   }
 
   Future<void> _generatePromptPayQR() async {
-  final prefs = await SharedPreferences.getInstance();
-  final token = prefs.getString('auth_token');  // ดึง Token จาก SharedPreferences
+    final prefs = await SharedPreferences.getInstance();
+    final token = prefs.getString('auth_token');
 
-  if (token == null || token.isEmpty) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('ไม่พบ Token กรุณาเข้าสู่ระบบใหม่')),
-    );
-    return;
-  }
-
-  try {
-    final response = await http.post(
-      Uri.parse("https://demoapi-production-9077.up.railway.app/api/payment/generate-qr"),  // แก้ URL ให้ตรงกับของจริง
-      headers: {
-        "Authorization": "Bearer $token",  // ส่ง Token ไปใน header
-        "Content-Type": "application/json",
-      },
-      body: jsonEncode({
-        "phoneNumber": "0812345678",  // เบอร์โทรที่ใช้ในการรับชำระ
-        "amount": widget.totalAmount.toStringAsFixed(2),  // ยอดเงินที่ต้องการชำระ
-      }),
-    );
-
-    print("Response status: ${response.statusCode}");
-    print("Response body: ${response.body}");
-
-    if (response.statusCode == 200) {
-      final data = jsonDecode(response.body);
-      final qrBase64 = data['qrImage'].split(',').last;  // ดึงเฉพาะข้อมูล QR Image จาก Base64
-
-      setState(() {
-        _qrBase64 = qrBase64;  // ตั้งค่าฐานข้อมูลของ QR ที่ได้รับ
-        _loadingQR = false;  // ตั้งให้การโหลด QR เสร็จสมบูรณ์
-      });
-    } else {
-      throw Exception("QR generation failed: ${response.body}");  // หากเกิดข้อผิดพลาดในการสร้าง QR
+    if (token == null || token.isEmpty) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('ไม่พบ Token กรุณาเข้าสู่ระบบใหม่')),
+        );
+      }
+      return;
     }
-  } catch (e) {
-    debugPrint("Error: $e");
-    setState(() {
-      _loadingQR = false;  // เปลี่ยนสถานะให้การโหลด QR เสร็จสิ้น
-    });
+
+    try {
+      final response = await http.post(
+        Uri.parse(
+            "https://demoapi-production-9077.up.railway.app/api/payment/generate-qr"),
+        headers: {
+          "Authorization": "Bearer $token",
+          "Content-Type": "application/json",
+        },
+        body: jsonEncode({
+          "phoneNumber": "0812345678",
+          "amount": widget.totalAmount.toStringAsFixed(2),
+        }),
+      );
+
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body);
+        final qrData = data['qrImage'] ?? '';
+
+        String qrBase64;
+        if (qrData.startsWith('data:image')) {
+          qrBase64 = qrData.split(',').last;
+        } else {
+          qrBase64 = qrData;
+        }
+
+        setState(() {
+          _qrBase64 = qrBase64;
+          _loadingQR = false;
+        });
+      } else {
+        throw Exception("QR generation failed: ${response.body}");
+      }
+    } catch (e) {
+      if (mounted) {
+        debugPrint("Error: $e");
+        setState(() {
+          _loadingQR = false;
+        });
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('เกิดข้อผิดพลาดในการสร้าง QR: $e')),
+        );
+      }
+    }
   }
-}
+  
 
-
-
-Future<void> uploadSlip() async {
+  Future<void> uploadSlip() async {
   if (_slipImage == null) {
     ScaffoldMessenger.of(context).showSnackBar(
       const SnackBar(content: Text('กรุณาเลือกสลิปก่อน')),
     );
     return;
   }
+  
+
+  setState(() => _uploading = true);
+  
 
   final prefs = await SharedPreferences.getInstance();
-  final token = prefs.getString('auth_token');
+  final token = prefs.getString('auth_token') ?? '';
 
-  if (token == null || token.isEmpty) {
+  if (token.isEmpty) {
     ScaffoldMessenger.of(context).showSnackBar(
       const SnackBar(content: Text('ไม่พบ Token กรุณาเข้าสู่ระบบใหม่')),
     );
+    setState(() => _uploading = false);
     return;
   }
 
-  final uri = Uri.parse('https://demoapi-production-9077.up.railway.app/api/bookings/upload-slip/${widget.bookingId}');
-  final request = http.MultipartRequest('POST', uri)
+  final uri = Uri.parse(
+      'https://demoapi-production-9077.up.railway.app/api/bookings/upload-slip/${widget.bookingId}');
+  
+  final request = http.MultipartRequest('PUT', uri)
     ..headers['Authorization'] = 'Bearer $token'
-    ..files.add(await http.MultipartFile.fromPath('slip', _slipImage!.path));
+    ..files.add(await http.MultipartFile.fromPath(
+      'slipImage',
+      _slipImage!.path,
+      contentType: MediaType('image', 'jpeg'),
+    ));
 
-  final response = await request.send();
+  print('Uploading slip to: $uri');
+  print('Booking ID: ${widget.bookingId}');
+  print('File path: ${_slipImage!.path}');
+  print('Token: $token');
+  print('Headers: ${request.headers}');
+  print('Files: ${request.files.map((f) => f.filename)}');
+  try {
+    final response = await request.send();
 
-  if (response.statusCode == 200) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('อัปโหลดสลิปสำเร็จ')),
-    );
-    Navigator.pop(context); // หรือไปหน้า success
-  } else {
-    final body = await response.stream.bytesToString();
-    debugPrint('Upload failed: $body');
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text('อัปโหลดล้มเหลว: ${response.statusCode}')),
+    final responseBody = await response.stream.bytesToString();
+    debugPrint("Upload response (${response.statusCode}): $responseBody");
+
+    if (response.statusCode == 200) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('อัปโหลดสลิปสำเร็จ')),
+      );
+      if (mounted) {
+    Navigator.pushAndRemoveUntil(
+      context,
+      MaterialPageRoute(builder: (_) => const HomeScreen()),
+      (route) => false, // ล้างหน้าก่อนหน้าออกหมด
     );
   }
-}
+    } else {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('อัปโหลดล้มเหลว (${response.statusCode})')),
+      );
+    }
+  } catch (e) {
+    debugPrint("Upload error: $e");
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text('เกิดข้อผิดพลาด: $e')),
+    );
+  }
 
+  setState(() => _uploading = false);
+}
 
 
 
@@ -169,7 +231,8 @@ Future<void> uploadSlip() async {
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
                 const Text("ยอดชำระทั้งหมด", style: TextStyle(fontSize: 16)),
-                Text("${widget.totalAmount.toStringAsFixed(2)} THB", style: const TextStyle(fontWeight: FontWeight.bold)),
+                Text("${widget.totalAmount.toStringAsFixed(2)} THB",
+                    style: const TextStyle(fontWeight: FontWeight.bold)),
               ],
             ),
             const SizedBox(height: 6),
@@ -241,14 +304,19 @@ Future<void> uploadSlip() async {
               children: [
                 Expanded(
                   child: ElevatedButton(
-  onPressed: uploadSlip,
-  style: ElevatedButton.styleFrom(
-    backgroundColor: Colors.green,
-    padding: const EdgeInsets.symmetric(vertical: 14),
-  ),
-  child: const Text("อัปโหลดสลิป", style: TextStyle(color: Colors.white)),
-),
-
+                    onPressed: _uploading ? null : uploadSlip,
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: Colors.green,
+                      padding: const EdgeInsets.symmetric(vertical: 14),
+                    ),
+                    child: _uploading
+                        ? const SizedBox(
+                            height: 20,
+                            width: 20,
+                            child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2),
+                          )
+                        : const Text("อัปโหลดสลิป", style: TextStyle(color: Colors.white)),
+                  ),
                 ),
                 const SizedBox(width: 12),
                 Expanded(
