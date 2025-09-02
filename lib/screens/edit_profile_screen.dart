@@ -48,73 +48,74 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
 
   // ฟังก์ชันบันทึกข้อมูลผู้ใช้และส่งไปยัง API
   Future<void> _saveProfile() async {
-  if (_formKey.currentState!.validate()) {
-    final prefs = await SharedPreferences.getInstance();
+    if (_formKey.currentState!.validate()) {
+      final prefs = await SharedPreferences.getInstance();
 
-    final firstName = _firstNameController.text.trim();
-    final lastName = _lastNameController.text.trim();
-    final phone = _phoneController.text.trim();
+      final firstName = _firstNameController.text.trim();
+      final lastName = _lastNameController.text.trim();
+      final phone = _phoneController.text.trim();
 
-    // ตรวจสอบว่าข้อมูลครบถ้วน
-    if (firstName.isEmpty || lastName.isEmpty || phone.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('กรุณากรอกข้อมูลให้ครบถ้วน')),
-      );
-      return;
-    }
-
-    final token = prefs.getString('auth_token');  // Token ที่บันทึกใน SharedPreferences
-    if (token == null || token.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('ไม่พบ Token กรุณาล็อกอินใหม่')),
-      );
-      return;
-    }
-
-    try {
-      // ส่งข้อมูลไปยัง API
-      final response = await http.put(
-        Uri.parse('https://demoapi-production-9077.up.railway.app/api/auth/update-profile'),
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': 'Bearer $token',  // ส่ง token สำหรับการยืนยันตัวตน
-        },
-        body: jsonEncode({
-          'firstName': firstName,
-          'lastName': lastName,
-          'phone': phone,
-        }),
-      );
-
-      print("Response status: ${response.statusCode}");
-      print("Response body: ${response.body}");
-
-      if (response.statusCode == 200) {
-        // API success response
-        final data = json.decode(response.body);
-        // บันทึกข้อมูลโปรไฟล์ใหม่ใน SharedPreferences
-        await prefs.setString('firstName', firstName);
-        await prefs.setString('lastName', lastName);
-        await prefs.setString('userPhone', phone);
-
+      // ตรวจสอบว่าข้อมูลครบถ้วน
+      if (firstName.isEmpty || lastName.isEmpty || phone.isEmpty) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('บันทึกข้อมูลสำเร็จ')),
+          const SnackBar(content: Text('กรุณากรอกข้อมูลให้ครบถ้วน')),
         );
-        Navigator.pop(context);  // กลับไปหน้าก่อนหน้า
-      } else {
-        // API failed response
-        throw Exception('ไม่สามารถบันทึกข้อมูลได้');
+        return;
       }
-    } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('เกิดข้อผิดพลาด: $e')),
-      );
+
+      final token = prefs.getString(
+        'auth_token',
+      ); // Token ที่บันทึกใน SharedPreferences
+      if (token == null || token.isEmpty) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('ไม่พบ Token กรุณาล็อกอินใหม่')),
+        );
+        return;
+      }
+
+      try {
+        // ส่งข้อมูลไปยัง API
+        final response = await http.put(
+          Uri.parse(
+            'https://demoapi-production-9077.up.railway.app/api/auth/update-profile',
+          ),
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': 'Bearer $token', // ส่ง token สำหรับการยืนยันตัวตน
+          },
+          body: jsonEncode({
+            'firstName': firstName,
+            'lastName': lastName,
+            'phone': phone,
+          }),
+        );
+
+        print("Response status: ${response.statusCode}");
+        print("Response body: ${response.body}");
+
+        if (response.statusCode == 200) {
+          // API success response
+          final data = json.decode(response.body);
+          // บันทึกข้อมูลโปรไฟล์ใหม่ใน SharedPreferences
+          await prefs.setString('firstName', firstName);
+          await prefs.setString('lastName', lastName);
+          await prefs.setString('userPhone', phone);
+
+          ScaffoldMessenger.of(
+            context,
+          ).showSnackBar(const SnackBar(content: Text('บันทึกข้อมูลสำเร็จ')));
+          Navigator.pop(context, true);
+        } else {
+          // API failed response
+          throw Exception('ไม่สามารถบันทึกข้อมูลได้');
+        }
+      } catch (e) {
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('เกิดข้อผิดพลาด: $e')));
+      }
     }
   }
-}
-
-
-
 
   @override
   Widget build(BuildContext context) {
@@ -174,13 +175,19 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                       onPressed: _saveProfile,
                       style: ElevatedButton.styleFrom(
                         backgroundColor: Colors.green[300],
-                        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 16,
+                          vertical: 8,
+                        ),
                         minimumSize: const Size(0, 36),
                       ),
-                      child: const Text("บันทึก", style: TextStyle(fontSize: 14, color: Colors.white)),
+                      child: const Text(
+                        "บันทึก",
+                        style: TextStyle(fontSize: 14, color: Colors.white),
+                      ),
                     ),
                   ],
-                )
+                ),
               ],
             ),
           ),

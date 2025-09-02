@@ -16,41 +16,42 @@ class _HomeScreenState extends State<HomeScreen> {
   int _currentIndex = 0;
   String _userName = '';
 
-  final List<Widget> _pages = [
-    const HomeMainPage(),
-    const MyBookingsScreen(),
-    const ProfileScreen(),
-  ];
-
-  final List<String> _titles = ["สนามแบดมินตัน", "การจองของฉัน", "โปรไฟล์"];
-
   @override
   void initState() {
     super.initState();
     loadUserName();
   }
 
-  Future<void> loadUserName() async {
-    final prefs = await SharedPreferences.getInstance();
-    final firstName = prefs.getString('firstName') ?? '';
-    setState(() {
-      _userName = firstName.trim();
-    });
-  }
+Future<void> loadUserName() async {
+  final prefs = await SharedPreferences.getInstance();
+  final firstName = prefs.getString('firstName') ?? '';
+  setState(() {
+    _userName = "$firstName ".trim();
+  });
+}
 
   @override
   Widget build(BuildContext context) {
+    // สร้าง pages ภายใน build() เพื่อให้ loadUserName ส่งไปใน ProfileScreen ได้
+    final List<Widget> pages = [
+      const HomeMainPage(),
+      const MyBookingsScreen(),
+      ProfileScreen(onProfileUpdated: loadUserName),
+    ];
+
+    final List<String> titles = ["สนามแบดมินตัน", "การจองของฉัน", "โปรไฟล์"];
+
     return Scaffold(
       appBar: AppBar(
         title: Text(
           _userName.isNotEmpty
               ? 'สวัสดีคุณ $_userName !'
-              : _titles[_currentIndex],
+              : titles[_currentIndex],
         ),
         backgroundColor: Colors.green[700],
         centerTitle: true,
       ),
-      body: SafeArea(child: _pages[_currentIndex]),
+      body: SafeArea(child: pages[_currentIndex]),
       bottomNavigationBar: BottomNavigationBar(
         currentIndex: _currentIndex,
         selectedItemColor: Colors.green[800],
@@ -67,7 +68,7 @@ class _HomeScreenState extends State<HomeScreen> {
           ),
           BottomNavigationBarItem(
             icon: Icon(Icons.calendar_today),
-            label: 'การจองของฉัน ',
+            label: 'การจองของฉัน',
           ),
           BottomNavigationBarItem(icon: Icon(Icons.person), label: 'โปรไฟล์'),
         ],

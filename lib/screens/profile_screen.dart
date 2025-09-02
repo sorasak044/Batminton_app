@@ -7,7 +7,8 @@ import 'edit_profile_screen.dart';
 import 'change_password_screen.dart';
 
 class ProfileScreen extends StatefulWidget {
-  const ProfileScreen({super.key});
+  final VoidCallback? onProfileUpdated;
+  const ProfileScreen({Key? key, this.onProfileUpdated}) : super(key: key);
 
   @override
   State<ProfileScreen> createState() => _ProfileScreenState();
@@ -16,193 +17,238 @@ class ProfileScreen extends StatefulWidget {
 class _ProfileScreenState extends State<ProfileScreen> {
   String _fullName = '';
   String _phone = '';
+  int _point = 0;
   bool _isLoading = true;
 
   @override
   void initState() {
     super.initState();
-    _fetchUserInfo();  // เรียกใช้ฟังก์ชันเพื่อโหลดข้อมูลผู้ใช้
+    _fetchUserInfo(); // เรียกใช้ฟังก์ชันเพื่อโหลดข้อมูลผู้ใช้
   }
 
   Future<void> _fetchUserInfo() async {
     final prefs = await SharedPreferences.getInstance();
-    final token = prefs.getString('auth_token');  // อ่าน token จาก SharedPreferences
+    final token = prefs.getString(
+      'auth_token',
+    ); // อ่าน token จาก SharedPreferences
 
     if (token == null || token.isEmpty) {
-      _logout(context);  // หากไม่มี token ให้ทำการล็อกเอาท์
+      _logout(context); // หากไม่มี token ให้ทำการล็อกเอาท์
       return;
     }
 
     final response = await http.get(
-      Uri.parse('https://demoapi-production-9077.up.railway.app/api/auth/whoami'),
+      Uri.parse(
+        'https://demoapi-production-9077.up.railway.app/api/auth/whoami',
+      ),
       headers: {
-        'Authorization': 'Bearer $token',  // ส่ง token ไปใน header
+        'Authorization': 'Bearer $token', // ส่ง token ไปใน header
       },
     );
 
     if (response.statusCode == 200) {
       final data = jsonDecode(response.body);
       setState(() {
-        _fullName = data['name'] ?? '';  // เก็บชื่อ
-        _phone = data['phone'] ?? '';  // เก็บเบอร์โทร
+        _fullName = data['name'] ?? ''; // เก็บชื่อ
+        _phone = data['phone'] ?? ''; // เก็บเบอร์โทร
+        _point = data['point'] ?? 0; // ดึงพอยต์
         _isLoading = false;
       });
+      prefs.setString('firstName', _fullName.split(' ').first);
+      if (widget.onProfileUpdated != null) {
+        widget.onProfileUpdated!();
+      }
     } else {
       print('❌ ดึงข้อมูลไม่สำเร็จ: ${response.body}');
-      setState(() => _isLoading = false);  // ถ้าเกิดข้อผิดพลาดจะเปลี่ยนการโหลดข้อมูล
+      setState(
+        () => _isLoading = false,
+      ); // ถ้าเกิดข้อผิดพลาดจะเปลี่ยนการโหลดข้อมูล
     }
   }
 
   Future<void> _logout(BuildContext context) async {
     final prefs = await SharedPreferences.getInstance();
-    await prefs.clear();  // เคลียร์ข้อมูลทั้งหมดจาก SharedPreferences
+    await prefs.clear(); // เคลียร์ข้อมูลทั้งหมดจาก SharedPreferences
 
     Navigator.pushReplacement(
       context,
-      MaterialPageRoute(builder: (_) => const LoginScreen()),  // ไปที่หน้า Login
+      MaterialPageRoute(builder: (_) => const LoginScreen()), // ไปที่หน้า Login
     );
   }
 
   @override
   Widget build(BuildContext context) {
     return _isLoading
-        ? const Center(child: CircularProgressIndicator())  // ถ้ายังโหลดข้อมูลไม่เสร็จจะแสดง Progress Indicator
+        ? const Center(
+          child: CircularProgressIndicator(),
+        ) // ถ้ายังโหลดข้อมูลไม่เสร็จจะแสดง Progress Indicator
         : SingleChildScrollView(
-            child: Column(
-              children: [
-                // ✅ ส่วนหัวโปรไฟล์
-                Container(
-                  color: Colors.green[300],
-                  width: double.infinity,
-                  padding: const EdgeInsets.symmetric(vertical: 24),
-                  child: Column(
-                    children: [
-                      const Text(
-                        'BADMINTON CLUB',
-                        style:
-                            TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+          child: Column(
+            children: [
+              // ✅ ส่วนหัวโปรไฟล์
+              Container(
+                color: Colors.green[300],
+                width: double.infinity,
+                padding: const EdgeInsets.symmetric(vertical: 24),
+                child: Column(
+                  children: [
+                    const Text(
+                      'BADMINTON CLUB',
+                      style: TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.bold,
                       ),
-                      const SizedBox(height: 16),
-                      const CircleAvatar(
-                        radius: 40,
-                        backgroundColor: Colors.white,
-                        child: Icon(Icons.person, size: 50, color: Colors.black),
-                      ),
-                      const SizedBox(height: 8),
-                      Text(
-                        _fullName,  // แสดงชื่อที่ได้จาก API
-                        style: const TextStyle(fontSize: 16),
-                      ),
-                      Text(
-                        _phone,  // แสดงเบอร์โทรที่ได้จาก API
-                        style: const TextStyle(color: Colors.grey),
-                      ),
-                    ],
-                  ),
+                    ),
+                    const SizedBox(height: 16),
+                    const CircleAvatar(
+                      radius: 40,
+                      backgroundColor: Colors.white,
+                      child: Icon(Icons.person, size: 50, color: Colors.black),
+                    ),
+                    const SizedBox(height: 8),
+                    Text(
+                      _fullName, // แสดงชื่อที่ได้จาก API
+                      style: const TextStyle(fontSize: 16),
+                    ),
+                    Text(
+                      _phone, // แสดงเบอร์โทรที่ได้จาก API
+                      style: const TextStyle(color: Colors.grey),
+                    ),
+                  ],
                 ),
+              ),
 
-                // 🏸 Member rank
-                Padding(
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                  child: Row(
-                    children: [
-                      Expanded(
-                        child: Container(
-                          padding: const EdgeInsets.all(12),
-                          decoration: BoxDecoration(
-                            color: Colors.green[100],
-                            borderRadius: BorderRadius.circular(12),
-                          ),
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              const Text("Member Rank",
-                                  style: TextStyle(fontSize: 14)),
-                              const Text("Bronze",
-                                  style: TextStyle(
-                                      fontSize: 18,
-                                      fontWeight: FontWeight.bold)),
-                              const SizedBox(height: 8),
-                              const Text("Member Point"),
-                              const SizedBox(height: 6),
-                              LinearProgressIndicator(
-                                value: 0.3,
-                                backgroundColor: Colors.grey[300],
-                                color: Colors.green,
+              // 🏸 Member rank
+              Padding(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 16,
+                  vertical: 12,
+                ),
+                child: Row(
+                  children: [
+                    Expanded(
+                      child: Container(
+                        padding: const EdgeInsets.all(12),
+                        decoration: BoxDecoration(
+                          color: Colors.green[100],
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            const Text(
+                              "Member Rank",
+                              style: TextStyle(fontSize: 14),
+                            ),
+                            const Text(
+                              "Bronze",
+                              style: TextStyle(
+                                fontSize: 18,
+                                fontWeight: FontWeight.bold,
                               ),
-                            ],
-                          ),
+                            ),
+                            const SizedBox(height: 8),
+                            Text("Member Point: $_point"),
+                            LinearProgressIndicator(
+                              value: (_point / 100).clamp(
+                                0.0,
+                                1.0,
+                              ), // สมมติคะแนนเต็ม 100
+                              backgroundColor: Colors.grey[300],
+                              color: Colors.green,
+                            ),
+
+                            const SizedBox(height: 6),
+                          ],
                         ),
                       ),
-                      const SizedBox(width: 12),
-                      Expanded(
-                        child: GestureDetector(
-                          onTap: () {
-                            // TODO: ไปหน้าแลกของขวัญ
-                          },
-                          child: Container(
-                            height: 100,
-                            decoration: BoxDecoration(
-                              color: Colors.blue[700],
-                              borderRadius: BorderRadius.circular(12),
-                              image: const DecorationImage(
-                                image: AssetImage("assets/images/gift.jpg"),
-                                fit: BoxFit.contain,
-                              ),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: GestureDetector(
+                        onTap: () {
+                          // TODO: ไปหน้าแลกของขวัญ
+                        },
+                        child: Container(
+                          height: 100,
+                          decoration: BoxDecoration(
+                            color: Colors.blue[700],
+                            borderRadius: BorderRadius.circular(12),
+                            image: const DecorationImage(
+                              image: AssetImage("assets/images/gift.jpg"),
+                              fit: BoxFit.contain,
                             ),
                           ),
                         ),
                       ),
-                    ],
-                  ),
+                    ),
+                  ],
                 ),
+              ),
 
-                // 📄 เมนู
-                Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 16),
-                  child: Column(
-                    children: [
-                      _buildMenuItem(Icons.person, "ข้อมูลส่วนตัว", () {
-                        Navigator.push(
-                            context,
-                            MaterialPageRoute(
-                                builder: (_) => const EditProfileScreen()));
-                      }),
-                      _buildMenuItem(Icons.star, "ประวัติพอยต์", () {}),
-                      _buildMenuItem(Icons.card_giftcard, "คูปองของฉัน", () {}),
-                      _buildMenuItem(Icons.lock, "เปลี่ยนรหัสผ่าน", () {
-                        Navigator.push(
-                            context,
-                            MaterialPageRoute(
-                                builder: (_) => const ForgetPasswordScreen()));
-                      }),
-                      _buildMenuItem(Icons.delete_forever,
-                          "ลบบัญชีผู้ใช้งานของฉัน", () {}),
-                    ],
-                  ),
+              // 📄 เมนู
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 16),
+                child: Column(
+                  children: [
+                    _buildMenuItem(Icons.person, "ข้อมูลส่วนตัว", () async {
+                      final result = await Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (_) => const EditProfileScreen(),
+                        ),
+                      );
+
+                      if (result == true) {
+                        await _fetchUserInfo(); // ✅ โหลดข้อมูลใหม่จาก API
+                        if (widget.onProfileUpdated != null) {
+                          widget
+                              .onProfileUpdated!(); // ✅ แจ้ง HomeScreen ให้เปลี่ยนชื่อ
+                        }
+                      }
+                    }),
+                    _buildMenuItem(Icons.star, "ประวัติพอยต์", () {}),
+                    _buildMenuItem(Icons.card_giftcard, "คูปองของฉัน", () {}),
+                    _buildMenuItem(Icons.lock, "เปลี่ยนรหัสผ่าน", () {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (_) => const ForgetPasswordScreen(),
+                        ),
+                      );
+                    }),
+                    _buildMenuItem(
+                      Icons.delete_forever,
+                      "ลบบัญชีผู้ใช้งานของฉัน",
+                      () {},
+                    ),
+                  ],
                 ),
+              ),
 
-                const SizedBox(height: 16),
+              const SizedBox(height: 16),
 
-                // 🚪 Logout
-                Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 32),
-                  child: SizedBox(
-                    width: double.infinity,
-                    child: ElevatedButton(
-                      onPressed: () => _logout(context),
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: Colors.red[300],
-                      ),
-                      child: const Text("ออกจากระบบ", style: TextStyle(color: Colors.white),),
+              // 🚪 Logout
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 32),
+                child: SizedBox(
+                  width: double.infinity,
+                  child: ElevatedButton(
+                    onPressed: () => _logout(context),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: Colors.red[300],
+                    ),
+                    child: const Text(
+                      "ออกจากระบบ",
+                      style: TextStyle(color: Colors.white),
                     ),
                   ),
                 ),
-                const SizedBox(height: 20),
-              ],
-            ),
-          );
+              ),
+              const SizedBox(height: 20),
+            ],
+          ),
+        );
   }
 
   Widget _buildMenuItem(IconData icon, String title, VoidCallback onTap) {
