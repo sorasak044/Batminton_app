@@ -4,6 +4,7 @@ import 'dart:convert';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'home_screen.dart';
 import 'register_screen.dart';
+import '/service/user_notification_service.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -17,12 +18,15 @@ class _LoginScreenState extends State<LoginScreen> {
   final passwordController = TextEditingController();
   bool _obscurePassword = true;
 
-  // ฟังก์ชันสำหรับการตรวจสอบว่า Token ถูกบันทึกไว้หรือไม่
+  final _userNotificationService = UserNotificationService();
+
+  /// ดึง Token ที่เคยบันทึกไว้
   Future<String?> _getToken() async {
     final prefs = await SharedPreferences.getInstance();
     return prefs.getString('auth_token');
   }
 
+  /// ฟังก์ชัน Login
   Future<void> loginUser() async {
     if (emailController.text.isEmpty || passwordController.text.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -40,8 +44,8 @@ class _LoginScreenState extends State<LoginScreen> {
         url,
         headers: {"Content-Type": "application/json"},
         body: json.encode({
-          "email": emailController.text,
-          "password": passwordController.text,
+          "email": emailController.text.trim(),
+          "password": passwordController.text.trim(),
         }),
       );
 
@@ -53,42 +57,14 @@ class _LoginScreenState extends State<LoginScreen> {
         final token = data['token'];
 
         final prefs = await SharedPreferences.getInstance();
-        await prefs.setString('auth_token', token); // บันทึก token ไว้
+        await prefs.setString('auth_token', token);
 
-        // เรียก API whoami เพื่อตรวจสอบตัวตนของผู้ใช้
-        final whoamiUrl = Uri.parse(
-          'https://demoapi-production-9077.up.railway.app/api/auth/whoami',
-        );
-        final whoamiRes = await http.get(
-          whoamiUrl,
-          headers: {"Authorization": "Bearer $token"}, // ส่ง token ใน header
-        );
+        // ✅ Init socket ทันทีหลัง login สำเร็จ
+        await _userNotificationService.initSocket();
 
-        if (whoamiRes.statusCode == 200) {
-          final userData = json.decode(whoamiRes.body);
-          final fullName = userData['name']?.trim() ?? 'สมชาย ใจดี';
-          final nameParts = fullName.split(' ');
-          final firstName = nameParts.isNotEmpty ? nameParts[0] : '';
-          final lastName = nameParts.length > 1 ? nameParts.sublist(1).join(' ') : '';
+        // ✅ เรียก API whoami
+        await _fetchUserData(token);
 
-          // บันทึกข้อมูลผู้ใช้ลงใน SharedPreferences
-          await prefs.setString('firstName', firstName);
-          await prefs.setString('lastName', lastName);
-          await prefs.setString('userName', fullName); 
-          await prefs.setString('userEmail', userData['email'] ?? '');
-          await prefs.setString('userPhone', userData['phone'] ?? '');
-
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text('เข้าสู่ระบบสำเร็จ! ยินดีต้อนรับคุณ $firstName'),
-            ),
-          );
-
-          Navigator.pushReplacement(
-            context,
-            MaterialPageRoute(builder: (_) => const HomeScreen()),
-          );
-        }
       } else {
         final error = json.decode(response.body);
         ScaffoldMessenger.of(context).showSnackBar(
@@ -103,17 +79,58 @@ class _LoginScreenState extends State<LoginScreen> {
     }
   }
 
-  @override
-  void initState() {
-    super.initState();
+  /// ดึงข้อมูลผู้ใช้จาก API whoami
+  Future<void> _fetchUserData(String token) async {
+    final whoamiUrl = Uri.parse(
+      'https://demoapi-production-9077.up.railway.app/api/auth/whoami',
+    );
+    final whoamiRes = await http.get(
+      whoamiUrl,
+      headers: {"Authorization": "Bearer $token"},
+    );
 
-    // ตรวจสอบ token ที่บันทึกไว้ใน SharedPreferences หากมีให้ทำการล็อกอินเข้าอัตโนมัติ
-    _getToken().then((token) {
-      if (token != null) {
+    if (whoamiRes.statusCode == 200) {
+      final userData = json.decode(whoamiRes.body);
+      final prefs = await SharedPreferences.getInstance();
+
+      final fullName = userData['name']?.trim() ?? 'สมชาย ใจดี';
+      final nameParts = fullName.split(' ');
+      final firstName = nameParts.isNotEmpty ? nameParts[0] : '';
+      final lastName = nameParts.length > 1 ? nameParts.sublist(1).join(' ') : '';
+
+      await prefs.setString('firstName', firstName);
+      await prefs.setString('lastName', lastName);
+      await prefs.setString('userName', fullName);
+      await prefs.setString('userEmail', userData['email'] ?? '');
+      await prefs.setString('userPhone', userData['phone'] ?? '');
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('เข้าสู่ระบบสำเร็จ! ยินดีต้อนรับคุณ $firstName')),
+        );
         Navigator.pushReplacement(
           context,
           MaterialPageRoute(builder: (_) => const HomeScreen()),
         );
+      }
+    }
+  }
+
+  @override
+  void initState() {
+    super.initState();
+    // ✅ Auto login ถ้ามี token
+    _getToken().then((token) async {
+      if (token != null) {
+        await _userNotificationService.initSocket();
+        await _fetchUserData(token);
+
+        if (mounted) {
+          Navigator.pushReplacement(
+            context,
+            MaterialPageRoute(builder: (_) => const HomeScreen()),
+          );
+        }
       }
     });
   }

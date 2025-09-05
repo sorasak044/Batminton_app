@@ -126,62 +126,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 ),
                 child: Row(
                   children: [
-                    Expanded(
-                      child: Container(
-                        padding: const EdgeInsets.all(12),
-                        decoration: BoxDecoration(
-                          color: Colors.green[100],
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            const Text(
-                              "Member Rank",
-                              style: TextStyle(fontSize: 14),
-                            ),
-                            const Text(
-                              "Bronze",
-                              style: TextStyle(
-                                fontSize: 18,
-                                fontWeight: FontWeight.bold,
-                              ),
-                            ),
-                            const SizedBox(height: 8),
-                            Text("Member Point: $_point"),
-                            LinearProgressIndicator(
-                              value: (_point / 100).clamp(
-                                0.0,
-                                1.0,
-                              ), // สมมติคะแนนเต็ม 100
-                              backgroundColor: Colors.grey[300],
-                              color: Colors.green,
-                            ),
-
-                            const SizedBox(height: 6),
-                          ],
-                        ),
-                      ),
-                    ),
                     const SizedBox(width: 12),
-                    Expanded(
-                      child: GestureDetector(
-                        onTap: () {
-                          // TODO: ไปหน้าแลกของขวัญ
-                        },
-                        child: Container(
-                          height: 100,
-                          decoration: BoxDecoration(
-                            color: Colors.blue[700],
-                            borderRadius: BorderRadius.circular(12),
-                            image: const DecorationImage(
-                              image: AssetImage("assets/images/gift.jpg"),
-                              fit: BoxFit.contain,
-                            ),
-                          ),
-                        ),
-                      ),
-                    ),
                   ],
                 ),
               ),
@@ -207,8 +152,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
                         }
                       }
                     }),
-                    _buildMenuItem(Icons.star, "ประวัติพอยต์", () {}),
-                    _buildMenuItem(Icons.card_giftcard, "คูปองของฉัน", () {}),
                     _buildMenuItem(Icons.lock, "เปลี่ยนรหัสผ่าน", () {
                       Navigator.push(
                         context,
