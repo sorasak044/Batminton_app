@@ -1,31 +1,45 @@
-import 'package:http/http.dart' as http;
 import 'dart:convert';
+import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 
 class NotificationApi {
-  static Future<void> updateUserNotiSetting(String bookingId, int minutes) async {
-    final prefs = await SharedPreferences.getInstance();
-    final token = prefs.getString('auth_token') ?? '';
+  static const String baseUrl =
+      "https://demoapi-production-9077.up.railway.app/api";
 
-    final url = Uri.parse(
-      "https://demoapi-production-9077.up.railway.app/api/notification/noti-setting/$bookingId",
-    );
+  static Future<Map<String, dynamic>?> updateUserNotiSetting(
+      String bookingId, int minutes) async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final token = prefs.getString('auth_token');
 
-    final response = await http.put(
-      url,
-      headers: {
-        "Content-Type": "application/json",
-        "Authorization": "Bearer $token",
-      },
-      body: json.encode([
-        {"notiBeforeUse": minutes}
-      ]),
-    );
+      if (token == null || token.isEmpty) {
+        throw Exception("⚠️ No auth token found");
+      }
 
-    if (response.statusCode == 200) {
-      print("✅ ตั้งค่าแจ้งเตือนสำเร็จ");
-    } else {
-      print("❌ Error: ${response.body}");
+      final url = Uri.parse("$baseUrl/notification/noti-setting/$bookingId");
+
+      final response = await http.put(
+        url,
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": "Bearer $token",
+        },
+        body: jsonEncode({
+          "notiBeforeUse": minutes,
+        }),
+      );
+
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body);
+        print("✅ Update Noti Success: $data");
+        return data;
+      } else {
+        print("⚠️ Update Noti Failed: ${response.statusCode} - ${response.body}");
+        return null;
+      }
+    } catch (e) {
+      print("🚨 Error update noti setting: $e");
+      return null;
     }
   }
 }

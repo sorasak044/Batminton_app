@@ -3,9 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 
-// เพิ่ม: service แจ้งเตือนในเครื่อง & API ตั้งค่าที่เซิร์ฟเวอร์ (ถ้ามี)
-import '/service/local_notification_service.dart';
-import '/service/notification_api.dart'; // ถ้าไฟล์ชื่อนี้ตามที่ทักทำไว้
+import '/service/notification_api.dart';
 
 class MyBookingsScreen extends StatefulWidget {
   const MyBookingsScreen({super.key});
@@ -21,8 +19,6 @@ class _MyBookingsScreenState extends State<MyBookingsScreen> {
   @override
   void initState() {
     super.initState();
-    // init แจ้งเตือน (เงียบๆ)
-    LocalNotificationService.instance.init();
     _fetchBookings();
   }
 
@@ -32,13 +28,14 @@ class _MyBookingsScreenState extends State<MyBookingsScreen> {
     final prefs = await SharedPreferences.getInstance();
     final token = prefs.getString('auth_token');
 
-    if (token == null) {
+    if (token == null || token.isEmpty) {
       setState(() => isLoading = false);
       return;
     }
 
     final url = Uri.parse(
-        'https://demoapi-production-9077.up.railway.app/api/bookings/my-bookings');
+      'https://demoapi-production-9077.up.railway.app/api/bookings/my-bookings',
+    );
 
     try {
       final response = await http.get(
@@ -50,29 +47,24 @@ class _MyBookingsScreenState extends State<MyBookingsScreen> {
       );
 
       if (response.statusCode == 200) {
-        final data = jsonDecode(response.body) ?? [];
+        final data = jsonDecode(response.body);
         setState(() {
-          bookings = data;
+          bookings = (data is List) ? data : [];
           isLoading = false;
         });
       } else {
         setState(() => isLoading = false);
-        throw Exception('Failed to fetch bookings: ${response.statusCode}');
       }
-    } catch (e) {
+    } catch (_) {
       setState(() => isLoading = false);
-      print("❌ Error: $e");
     }
   }
 
-  // === ตั้งค่าแจ้งเตือนฝั่งเซิร์ฟเวอร์ (optional) + ตั้งแจ้งเตือนในเครื่อง ===
+  /// ฟังก์ชันเปิด Dialog ตั้งเวลาแจ้งเตือน
   Future<void> _openReminderDialog({
     required int bookingId,
-    required DateTime startLocal,
-    required String titleForNoti,
-    required String bodyForNoti,
   }) async {
-    final controller = TextEditingController(text: '30'); // default 30 นาที
+    final controller = TextEditingController(text: '30');
     final minutes = await showDialog<int>(
       context: context,
       builder: (ctx) => AlertDialog(
@@ -86,11 +78,17 @@ class _MyBookingsScreenState extends State<MyBookingsScreen> {
           ),
         ),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('ยกเลิก')),
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('ยกเลิก'),
+          ),
           ElevatedButton(
             onPressed: () {
               final value = int.tryParse(controller.text.trim());
-              Navigator.pop(ctx, (value == null || value <= 0) ? null : value);
+              Navigator.pop(
+                ctx,
+                (value == null || value < 5) ? null : value, // backend ต้อง >= 5 นาที
+              );
             },
             child: const Text('บันทึก'),
           ),
@@ -100,165 +98,170 @@ class _MyBookingsScreenState extends State<MyBookingsScreen> {
 
     if (minutes == null) return;
 
-    // (ทางเลือก) อัปเดตการตั้งค่าไปเซิร์ฟเวอร์ด้วย
     try {
-      await NotificationApi.updateUserNotiSetting(bookingId.toString(), minutes);
-    } catch (_) {}
+      final result = await NotificationApi.updateUserNotiSetting(
+        bookingId.toString(),
+        minutes,
+      );
 
-    // ตั้งแจ้งเตือนในเครื่อง
-    await LocalNotificationService.instance.scheduleBookingReminder(
-      id: bookingId,
-      startTimeLocal: startLocal,
-      minutesBefore: minutes,
-      title: titleForNoti,
-      body: bodyForNoti,
-    );
+      if (!mounted) return;
 
-    if (!mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text('ตั้งเตือนล่วงหน้า $minutes นาทีเรียบร้อย')),
-    );
+      if (result != null && result['message'] != null) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(result['message'])),
+        );
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('ไม่สามารถอัปเดตการแจ้งเตือนได้')),
+        );
+      }
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('เกิดข้อผิดพลาด: $e')),
+      );
+    }
   }
 
-  String _formatTime(String iso) {
-    final dateTime = DateTime.parse(iso).toLocal();
-    return "${dateTime.hour.toString().padLeft(2, '0')}:${dateTime.minute.toString().padLeft(2, '0')}";
-  }
+  String _fmt(DateTime dt) =>
+      "${dt.hour.toString().padLeft(2, '0')}:${dt.minute.toString().padLeft(2, '0')}";
 
   @override
   Widget build(BuildContext context) {
-    return isLoading
-        ? const Center(child: CircularProgressIndicator())
-        : SingleChildScrollView(
-            padding: const EdgeInsets.all(16),
-            child: Column(
+    if (isLoading) {
+      return const Center(child: CircularProgressIndicator());
+    }
+
+    return SingleChildScrollView(
+      padding: const EdgeInsets.all(16),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text(
+            "การจองของฉัน",
+            style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold),
+          ),
+          const SizedBox(height: 20),
+          ..._groupBookingsByDate().entries.map((dateEntry) {
+            final date = dateEntry.key;
+            final bookingsByTime = dateEntry.value;
+
+            return Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const Text(
-                  "การจองของฉัน",
-                  style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold),
+                Text(
+                  date,
+                  style: const TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.bold,
+                  ),
                 ),
-                const SizedBox(height: 20),
-                ..._groupBookingsByDate().entries.map((dateEntry) {
-                  final date = dateEntry.key;
-                  final bookingsByTime = dateEntry.value;
+                const SizedBox(height: 6),
+                ...bookingsByTime.entries.map((timeEntry) {
+                  final timeRange = timeEntry.key;
+                  final courts = timeEntry.value; // list<Map>
+                  final totalPrice = courts.fold<double>(
+                    0,
+                    (sum, c) =>
+                        sum + ((c['pricePerHour'] as num?)?.toDouble() ?? 0.0),
+                  );
+                  final status = courts.first['status'] as String? ?? 'PENDING';
+                  final bookingId = courts.first['id'] as int;
 
-                  return Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        date,
-                        style: const TextStyle(
-                          fontSize: 16,
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-                      const SizedBox(height: 6),
-                      ...bookingsByTime.entries.map((timeEntry) {
-                        final timeRange = timeEntry.key;
-                        final courts = timeEntry.value; // list<Map>
-                        final totalPrice =
-                            courts.fold<double>(0, (sum, c) => sum + (c['pricePerHour'] ?? 0));
-                        final status = courts.first['status'];
-
-                        // เพิ่ม: ใช้ข้อมูลตัวแรกของกลุ่มเป็นตัวแทน (มี bookingId & startLocal)
-                        final bookingId = courts.first['id'] as int;
-                        final startLocal = courts.first['startLocal'] as DateTime;
-
-                        return Card(
-                          margin: const EdgeInsets.only(bottom: 12),
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(12),
+                  return Card(
+                    margin: const EdgeInsets.only(bottom: 12),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: Padding(
+                      padding: const EdgeInsets.all(16),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            "$timeRange : ${courts.map((c) => c['court']['name']).join(', ')}",
+                            style: const TextStyle(fontSize: 14),
                           ),
-                          child: Padding(
-                            padding: const EdgeInsets.all(16),
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text(
-                                  "$timeRange : ${courts.map((c) => c['court']['name']).join(', ')}",
-                                  style: const TextStyle(fontSize: 14),
+                          const SizedBox(height: 6),
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: [
+                              Text(
+                                "฿${totalPrice.toStringAsFixed(2)}",
+                                style: const TextStyle(
+                                  fontWeight: FontWeight.w600,
                                 ),
-                                const SizedBox(height: 6),
-                                Row(
-                                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                                  children: [
-                                    Text(
-                                      "฿${totalPrice.toStringAsFixed(2)}",
-                                      style: const TextStyle(fontWeight: FontWeight.w600),
-                                    ),
-                                    Container(
-                                      padding: const EdgeInsets.symmetric(
-                                        horizontal: 12,
-                                        vertical: 6,
-                                      ),
-                                      decoration: BoxDecoration(
-                                        color: status == "PENDING"
-                                            ? Colors.orange[100]
-                                            : Colors.green[100],
-                                        borderRadius: BorderRadius.circular(20),
-                                      ),
-                                      child: Text(
-                                        status == "PENDING" ? "รอชำระเงิน" : "จองสำเร็จ",
-                                        style: const TextStyle(fontSize: 12),
-                                      ),
-                                    ),
-                                  ],
+                              ),
+                              Container(
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 12,
+                                  vertical: 6,
                                 ),
-
-                                // 🔔 ปุ่มที่ "เพิ่ม" เข้ามา (UI เดิมคงไว้ 100%)
-                                const SizedBox(height: 8),
-                                Align(
-                                  alignment: Alignment.centerRight,
-                                  child: TextButton.icon(
-                                    icon: const Icon(Icons.alarm),
-                                    label: const Text('ตั้งเตือน'),
-                                    onPressed: () {
-                                      final title = 'เตือนการจองสนามแบด';
-                                      final body = 'รอบ $timeRange กำลังจะเริ่ม';
-                                      _openReminderDialog(
-                                        bookingId: bookingId,
-                                        startLocal: startLocal,
-                                        titleForNoti: title,
-                                        bodyForNoti: body,
-                                      );
-                                    },
-                                  ),
+                                decoration: BoxDecoration(
+                                  color: status == "PENDING"
+                                      ? Colors.orange[100]
+                                      : Colors.green[100],
+                                  borderRadius: BorderRadius.circular(20),
                                 ),
-                              ],
+                                child: Text(
+                                  status == "PENDING"
+                                      ? "รอชำระเงิน"
+                                      : "จองสำเร็จ",
+                                  style: const TextStyle(fontSize: 12),
+                                ),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 8),
+                          Align(
+                            alignment: Alignment.centerRight,
+                            child: TextButton.icon(
+                              icon: const Icon(Icons.alarm),
+                              label: const Text('ตั้งเตือน'),
+                              onPressed: () {
+                                _openReminderDialog(
+                                  bookingId: bookingId,
+                                );
+                              },
                             ),
                           ),
-                        );
-                      }).toList(),
-                    ],
+                        ],
+                      ),
+                    ),
                   );
                 }).toList(),
               ],
-            ),
-          );
+            );
+          }).toList(),
+        ],
+      ),
+    );
   }
 
-  /// จัดกลุ่ม bookings: แยกตามวันก่อน แล้วตามเวลา
-  /// (เพิ่มเก็บ id และ startLocal ไว้ในกลุ่มด้วย เพื่อใช้ตั้งเตือน)
+  /// แยกกลุ่มตามวัน -> เวลา และแนบข้อมูลที่ต้องใช้เตือน
   Map<String, Map<String, List<Map<String, dynamic>>>> _groupBookingsByDate() {
     final Map<String, Map<String, List<Map<String, dynamic>>>> grouped = {};
 
     for (var booking in bookings) {
-      final date = booking['startTime'].substring(0, 10);
-      final startLocal = DateTime.parse(booking['startTime']).toLocal();
-      final endLocal = DateTime.parse(booking['endTime']).toLocal();
-      final start = "${startLocal.hour.toString().padLeft(2, '0')}:${startLocal.minute.toString().padLeft(2, '0')}";
-      final end = "${endLocal.hour.toString().padLeft(2, '0')}:${endLocal.minute.toString().padLeft(2, '0')}";
+      final startIso = booking['startTime'] as String;
+      final endIso = booking['endTime'] as String;
+
+      final startLocal = DateTime.parse(startIso).toLocal();
+      final endLocal = DateTime.parse(endIso).toLocal();
+
+      final date = startIso.substring(0, 10);
+      final start = _fmt(startLocal);
+      final end = _fmt(endLocal);
       final timeRange = "$start - $end";
 
       grouped.putIfAbsent(date, () => {});
       grouped[date]!.putIfAbsent(timeRange, () => []);
 
       grouped[date]![timeRange]!.add({
-        'id': booking['id'], // <-- จำเป็นสำหรับ notification id
-        'startLocal': startLocal, // <-- เอาไว้คำนวณเวลาเตือน
+        'id': booking['id'] as int,
+        'startLocal': startLocal,
         'court': booking['court'],
-        'pricePerHour': booking['court']['pricePerHour'] ?? 0,
+        'pricePerHour': booking['court']?['pricePerHour'] ?? 0,
         'status': booking['status'],
       });
     }

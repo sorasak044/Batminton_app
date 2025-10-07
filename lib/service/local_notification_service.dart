@@ -1,69 +1,85 @@
+// service/local_notification_service.dart
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
+import 'package:timezone/data/latest_all.dart' as tz;
 import 'package:timezone/timezone.dart' as tz;
+import 'package:flutter/material.dart';
 
 class LocalNotificationService {
-  LocalNotificationService._internal();
-  static final LocalNotificationService instance =
-      LocalNotificationService._internal();
+  LocalNotificationService._internal(); // Singleton
+  static final LocalNotificationService instance = LocalNotificationService._internal();
 
-  final FlutterLocalNotificationsPlugin _notificationsPlugin =
-      FlutterLocalNotificationsPlugin();
+  final FlutterLocalNotificationsPlugin flutterLocalNotificationsPlugin = FlutterLocalNotificationsPlugin();
 
-  Future<void> init() async {
-    const androidInit = AndroidInitializationSettings('@mipmap/ic_launcher');
-    const initSettings = InitializationSettings(android: androidInit);
-
-    await _notificationsPlugin.initialize(initSettings);
-
-    // ✅ ขอ permission Android 13+
-    final androidImplementation = _notificationsPlugin
-        .resolvePlatformSpecificImplementation<
-            AndroidFlutterLocalNotificationsPlugin>();
-    await androidImplementation?.requestPermission();
-
-    // ✅ ขอ permission iOS
-    final iosImplementation = _notificationsPlugin
-        .resolvePlatformSpecificImplementation<
-            IOSFlutterLocalNotificationsPlugin>();
-    await iosImplementation?.requestPermissions(
-      alert: true,
-      badge: true,
-      sound: true,
-    );
+  /// 💡 ฟังก์ชันจัดการเมื่อผู้ใช้กด Notification (ใช้สำหรับ Local/Foreground)
+  static void onDidReceiveNotificationResponse(NotificationResponse notificationResponse) async {
+    final String? payload = notificationResponse.payload;
+    if (payload != null) {
+      debugPrint('Local Notification Tapped! Payload: $payload');
+      // TODO: Implement navigation logic here if needed
+    }
   }
 
-  /// ตั้งแจ้งเตือนก่อนเวลาใช้งานสนาม (minutesBefore)
-  Future<void> scheduleBookingReminder({
+  Future<void> init() async {
+    // 1. ตั้งค่าสำหรับแต่ละ Platform
+    const AndroidInitializationSettings initializationSettingsAndroid =
+        AndroidInitializationSettings('@mipmap/ic_launcher');
+    
+    // iOS/macOS: ขอ permission ให้แสดง alert, badge, sound
+    const DarwinInitializationSettings initializationSettingsDarwin = 
+        DarwinInitializationSettings(
+          requestAlertPermission: true, 
+          requestBadgePermission: true, 
+          requestSoundPermission: true,
+        );
+
+    const InitializationSettings initializationSettings = InitializationSettings(
+      android: initializationSettingsAndroid,
+      iOS: initializationSettingsDarwin,
+      macOS: initializationSettingsDarwin,
+    );
+
+    // 2. Initialize plugin
+    await flutterLocalNotificationsPlugin.initialize(
+      initializationSettings,
+      onDidReceiveNotificationResponse: onDidReceiveNotificationResponse,
+      onDidReceiveBackgroundNotificationResponse: onDidReceiveNotificationResponse,
+    );
+    
+    // 3. ตั้งค่า Timezone สำหรับ Scheduled Notifications (ถ้ามี)
+    tz.initializeTimeZones(); 
+  }
+
+  /// 💡 ฟังก์ชันที่ใช้แสดง Notification ในสถานะ Foreground / Background
+  Future<void> showNotification({
     required int id,
-    required DateTime startTimeLocal,
-    required int minutesBefore,
     required String title,
     required String body,
+    String? payload,
   }) async {
-    final scheduled = startTimeLocal.subtract(Duration(minutes: minutesBefore));
-
-    if (scheduled.isBefore(DateTime.now())) {
-      print("⚠️ เวลาที่เลือกผ่านมาแล้ว ไม่ตั้งแจ้งเตือน");
-      return;
-    }
-
-    await _notificationsPlugin.zonedSchedule(
-  id,
-  title,
-  body,
-  tz.TZDateTime.from(scheduled, tz.local),
-  const NotificationDetails(
-    android: AndroidNotificationDetails(
-      'reminder_channel',
-      'การแจ้งเตือน',
-      channelDescription: 'แจ้งเตือนการใช้งานสนาม',
+    const AndroidNotificationDetails androidDetails = AndroidNotificationDetails(
+      'booking_reminder_ch', // ✅ ต้องตรง backend
+      'Booking Reminder',
+      channelDescription: 'Notifications about booking updates.',
       importance: Importance.max,
       priority: Priority.high,
-    ),
-  ),
-  androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
-  payload: 'booking_$id',
-);
+      playSound: true,
+    );
 
+    const DarwinNotificationDetails iosDetails = DarwinNotificationDetails(
+      presentAlert: true,
+      presentBadge: true,
+      presentSound: true,
+    );
+
+    const NotificationDetails platformDetails = 
+        NotificationDetails(android: androidDetails, iOS: iosDetails);
+
+    await flutterLocalNotificationsPlugin.show(
+      id,
+      title,
+      body,
+      platformDetails,
+      payload: payload,
+    );
   }
 }

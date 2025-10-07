@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "873363533928",
+    "project_id": "coffee-spark-sample-app-db006",
+    "storage_bucket": "coffee-spark-sample-app-db006.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:873363533928:android:37761f850551e3da778bdd",
+        "android_client_info": {
+          "package_name": "com.example.badminton_booking_app"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyDn7OcFpo_86OGYa06yQ8eHvLP__mClRks"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
